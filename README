@@ -1,0 +1,144 @@
+
+                    .:. MySQL Global User Variables UDF .:.
+
+
+            ------------------------ BLURB ------------------------
+
+
+This shared library adds simple user functions to MySQL in order to keep
+persistent shared variables in memory. These variables and their values are
+available to all clients. Any data can be stored into these persistent
+variables, including BLOBs. Since updates are atomic and way faster than
+MEMORY tables, this is an easy and efficient way to handle counters and
+sequences.
+
+The MySQL Global User Variables UDF home page is:
+http://mysql-udf-global-user-variables.pureftpd.org
+
+
+         ------------------------ INSTALLATION ------------------------
+         
+
+On most systems, compiling and installing the library should be as simple as
+typing (as root):
+
+make install
+
+The shared library is installed as /usr/local/lib/udf_global_user_variables.so
+
+If the base directory of your MySQL installation is not in /usr/local, just
+type:
+
+make
+
+and then copy udf_global_user_variables.so to the right location for UDFs on
+your system (maybe /usr/lib/).
+
+The name of a variable is limited to 256 bytes. If that limit is too low
+for your specific application, just edit the MAX_NAME_LENGTH variable on top
+of the .c file and reinstall. Variable names can contain binary characters.
+
+Values are limited to 65536 bytes. If that limit is too low for you, edit the
+MAX_VALUE_LENGTH variable and reinstall.
+
+
+     ------------------------ LOADING THE LIBRARY ------------------------
+         
+
+In order to load the shared library, the following SQL statements must be
+executed:
+
+DROP FUNCTION IF EXISTS global_set;
+CREATE FUNCTION global_set RETURNS INTEGER
+  SONAME 'udf_global_user_variables.so';
+
+DROP FUNCTION IF EXISTS global_get;
+CREATE FUNCTION global_get RETURNS STRING
+  SONAME 'udf_global_user_variables.so';
+
+DROP FUNCTION IF EXISTS global_add;
+CREATE FUNCTION global_add RETURNS INTEGER
+  SONAME 'udf_global_user_variables.so';
+
+These statements are saved into the table definition. You just need to execute
+them once, excepted if you upgrade or reinstall the library.
+
+
+       ------------------------ STORING A VALUE ------------------------
+         
+
+An unlimited number of user variables can be created, as long as memory is
+available.
+
+The GLOBAL_SET(<variable name>, <value>) stores a new shared global variable.
+
+Examples:
+mysql> DO GLOBAL_SET("online_users", 42);
+mysql> DO GLOBAL_SET("secret_key", "pajfUyfnd");
+
+The GLOBAL_SET() function always returns 1 unless an error occurred.
+
+GLOBAL_STORE() is an alias for GLOBAL_SET().
+
+
+      ------------------------ FETCHING A VALUE ------------------------
+         
+
+Reading the value of a variable is the job of the GLOBAL_GET(<variable name>)
+function.
+
+The value is returned, or NULL is the variable is undefined.
+
+Example:
+mysql> SELECT GLOBAL_GET("online_users");
+42
+
+mysql> SELECT id FROM pxs WHERE secret_key = GLOBAL_GET("secret_key");
+1
+
+
+      ------------------------ ATOMIC INCREMENTS ------------------------
+         
+
+A single function call can read the previous value, add an integer (that can
+be negative), and store the new value into the variable.
+
+The function is GLOBAL_ADD(<variable name>, <value>) and the return value is
+the new value of the variable.
+
+Updates are always atomic, if the old value is 18 and you add 1, you will
+always get back 19.
+
+Example:
+mysql> DO GLOBAL_ADD("online_users", 1);
+mysql> SELECT GLOBAL_ADD("online_users", -4);
+39
+
+If the value of a variable was a string, the new value is the increment:
+
+mysql> SELECT GLOBAL_ADD("secret_key", 12);
+12
+
+Adding a value to an undefined variable returns NULL.
+
+A handy variant is GLOBAL_ADDP(<variable name>, <value>). GLOBAL_ADDP() is
+similar to GLOBAL_ADD() but returns the PREVIOUS value of the variable
+instead of the new one.
+
+Example:
+mysql> DO GLOBAL_SET("xxx", 10);
+mysql> SELECT GLOBAL_ADDP("xxx", 1);
+10
+mysql> SELECT GLOBAL_ADDP("xxx", 1);
+11
+
+
+
+
+
+
+
+                                         -Frank DENIS <j [at] pureftpd.org>
+
+
+
